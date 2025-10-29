@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "lib/ractor/shim/version"
-
 Gem::Specification.new do |spec|
   spec.name = "ractor-shim"
-  spec.version = Ractor::Shim::VERSION
+  spec.version = "0.0.1"
   spec.authors = ["Benoit Daloze"]
   spec.email = ["eregontp@gmail.com"]
 

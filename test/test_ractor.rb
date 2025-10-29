@@ -133,7 +133,7 @@ assert_equal '[1, 2, 3]', %q{
   a << ports[1].receive # 1
   a << ports[2].receive # 2
   a << ports[0].receive # 3
-  a
+  ports.each(&:close); a
 }
 
 # dtoa race condition
@@ -436,7 +436,7 @@ assert_equal '{ok: 3}', %q{
   end
 
   3.times.map{Ractor.receive}.tally
-} unless yjit_enabled? # YJIT: `[BUG] Bus Error at 0x000000010b7002d0` in jit_exec()
+} # unless yjit_enabled? # YJIT: `[BUG] Bus Error at 0x000000010b7002d0` in jit_exec()
 
 # unshareable object are copied
 assert_equal 'false', %q{
@@ -527,7 +527,7 @@ assert_equal "ok", <<~'RUBY', frozen_string_literal: false
   }
 
   if results.empty?
-    :ok
+    port.close; echo_ractor.close; :ok
   else
     results.inspect
   end
@@ -901,9 +901,9 @@ assert_equal '["instance-variable", "instance-variable", nil]', %q{
   class C
     @iv1 = ""
     @iv2 = 42
-    def self.iv1 = defined?(@iv1) # "instance-variable"
-    def self.iv2 = defined?(@iv2) # "instance-variable"
-    def self.iv3 = defined?(@iv3) # nil
+    def self.iv1; defined?(@iv1); end # "instance-variable"
+    def self.iv2; defined?(@iv2); end # "instance-variable"
+    def self.iv3; defined?(@iv3); end # nil
   end
 
   Ractor.new{
@@ -1303,6 +1303,7 @@ assert_equal '[nil, "b", "a"]', %q{
   ans << Ractor.current[:key]
 }
 
+# Ractor-local storage with Thread inheritance of current Ractor
 assert_equal '1', %q{
   N = 1_000
   Ractor.new{
@@ -1352,6 +1353,7 @@ assert_equal "#{N}#{N}", %Q{
   }.map{|r| r.value}.join
 }
 
+# fstring pool 2
 assert_equal "ok", %Q{
   N = #{N}
   a, b = 2.times.map{
@@ -1431,7 +1433,7 @@ assert_equal "ok", %q{
     end
   }
   "ok"
-} if !yjit_enabled? && ENV['GITHUB_WORKFLOW'] != 'ModGC' # flaky
+} # if !yjit_enabled? && ENV['GITHUB_WORKFLOW'] != 'ModGC' # flaky
 
 # check method cache invalidation
 assert_equal "ok", %q{
@@ -1458,7 +1460,7 @@ assert_equal "ok", %q{
     end
   end
 
-  Ractor.new do
+  r = Ractor.new do
     b = B.new
     100_000.times do
       raise unless b.foo == 1
@@ -1470,7 +1472,7 @@ assert_equal "ok", %q{
     raise unless a.foo == 2
   end
 
-  "ok"
+  r.join; "ok"
 }
 
 # check method cache invalidation
@@ -1648,7 +1650,7 @@ assert_equal '600', %q{
   end
 
   h.sum{|k, v| v}
-} unless yjit_enabled? # http://ci.rvm.jp/results/trunk-yjit@ruby-sp2-docker/4466770
+} # unless yjit_enabled? # http://ci.rvm.jp/results/trunk-yjit@ruby-sp2-docker/4466770
 
 # Selector should be GCed (free'ed) without trouble
 assert_equal 'ok', %q{
@@ -1683,7 +1685,7 @@ assert_equal 'true', %q{
       super
     end
     Object.prepend self
-    set_temporary_name 'Ractor#require'
+    # set_temporary_name 'Ractor#require'
   end
 
   Ractor.new{
