@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Ractor
+class Ractor
   module Shim
     VERSION = "0.1.0"
   end
