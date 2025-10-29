@@ -2,7 +2,11 @@
 
 A shim to define `Ractor` by using `Thread`, if `Ractor` is not already defined.
 
-This is notably useful to run programs needing `Ractor` on Ruby implementations which don't define `Ractor.
+This is notably useful to run programs needing `Ractor` on Ruby implementations which don't define `Ractor` such as TruffleRuby and JRuby.
+
+Note that TruffleRuby and JRuby both run Ruby code in threads in parallel, so this gem enables using the Ractor API on these Rubies and run Ractors in parallel.
+
+The gem also provides the Ruby 3.5 Ractor API for Ruby 2.7 to 3.4.
 
 ## Usage
 
