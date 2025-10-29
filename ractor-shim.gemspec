@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = "ractor-shim"
-  spec.version = "0.0.1"
+  spec.version = "0.1.0"
   spec.authors = ["Benoit Daloze"]
   spec.email = ["eregontp@gmail.com"]
 
