@@ -130,10 +130,10 @@ if Ractor.shim?
     def initialize(*args, name: nil, &block)
       raise ArgumentError, "must be called with a block" unless block
       initialize_common(name, block)
+      CHANGE_COUNT.call(1)
 
       @thread = Thread.new {
         Thread.current.thread_variable_set(:current_ractor, self)
-        CHANGE_COUNT.call(1)
         begin
           result = self.instance_exec(*args, &block)
           SELECT_MUTEX.synchronize {

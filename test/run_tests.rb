@@ -126,13 +126,11 @@ end
 if Ractor.shim? && RUBY_ENGINE == "ruby" && RUBY_VERSION < "3.0"
   # fails on 2.7
   skips += [
-    "Ractor.count",
     "check method cache invalidation", # syntax
   ]
 end
 if Ractor.shim? && RUBY_ENGINE == "jruby"
   skips += [
-    "Ractor.count",
     "ObjectSpace.each_object can not handle unshareable objects with Ractors",
     "fstring pool 2", # spurious, probably a fstring table bug
   ]
