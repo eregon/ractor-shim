@@ -8,7 +8,9 @@ Note that TruffleRuby and JRuby both run Ruby code in threads in parallel, so th
 
 The gem also provides the Ruby 3.5 Ractor API  (`Ractor::Port`, `Ractor#{join,value,monitor}`, etc) for CRuby 2.7 to 3.4.
 
-When `Ractor` is not already defined, this gem implements `Ractor.make_shareable(object)` by just returning `object` to avoid unnecessary overhead. The reason is that the CRuby implementation of `Ractor.make_shareable` returns an immutable object, so it won't be mutated by the program anyway and there is no need to deep freeze.
+When `Ractor` is not already defined, this gem implements `Ractor.make_shareable(object)` by just returning `object` to avoid unnecessary overhead.
+The main reason is that the CRuby implementation of `Ractor.make_shareable` returns an immutable object, so it won't be mutated by the program anyway and there is no need to deep freeze.
+Another reason is many gems do `Ractor.make_shareable(object) if defined?(Ractor)` and so that becomes dependent on whether `Ractor` is defined before that gem loads. That problem disappears if `Ractor.make_shareable(object)` is noop.
 
 ## Installation
 
