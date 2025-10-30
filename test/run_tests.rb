@@ -112,6 +112,7 @@ if Ractor.builtin? && RUBY_VERSION < "3.3"
   # fails on 3.2
   skips += [
     "check moved object", # SEGV
+    "fstring pool 2", # spurious, probably a fstring table bug
   ]
 end
 if Ractor.builtin? && RUBY_VERSION < "3.1"
@@ -126,7 +127,6 @@ if Ractor.shim? && RUBY_ENGINE == "ruby" && RUBY_VERSION < "3.0"
   # fails on 2.7
   skips += [
     "Ractor.count",
-    "fstring pool 2", # spurious, probably a fstring table bug
     "check method cache invalidation", # syntax
   ]
 end
