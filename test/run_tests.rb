@@ -10,7 +10,6 @@ BUILTIN_SKIPS = [
   "SystemExit from a Thread inside a Ractor is re-raised", # Ractor::ClosedError on 3.4 instead of Ractor::RemoteError
   "Access to global-variables are prohibited (read)", # different error message on 3.4
   "Access to global-variables are prohibited (write)", # different error message on 3.4
-  "Ractor.make_shareable(a_proc) is not supported now.", # no error on 3.4
   "Ractor-local storage", # more permissive on 3.4
   "Now NoMethodError is copyable", # fails on 3.4
   "bind_call in Ractor [Bug #20934]", # SEGV on 3.4
@@ -61,7 +60,6 @@ SHIM_SKIPS = [
   "ObjectSpace._id2ref can not handle unshareable objects with Ractors", # can't check
   "Ractor.make_shareable(obj)", # expected due to no freeze
   "Ractor.make_shareable(obj) doesn't freeze shareable objects", # expected due to no freeze
-  "Ractor.make_shareable(a_proc) is not supported now.", # can't check
   "Ractor.shareable?(recursive_objects)", # expected, due to all are shareable
   "Ractor.make_shareable(recursive_objects)", # expected, due to all are shareable
   "Ractor.make_shareable(obj, copy: true) makes copied shareable object.", # expected, due to all are shareable
@@ -76,6 +74,7 @@ SHIM_SKIPS = [
 ]
 
 GLOBAL_SKIPS = [
+  "Ractor.make_shareable(a_proc) requires a shareable receiver", # because this harness uses Object as outer self
   "threads in a ractor will killed", # leaks Ractors
   "TracePoint with normal Proc should be Ractor local", # line numbers differ due to test harness
   "Can yield back values while GC is sweeping [Bug #18117]", # too slow and leaks
@@ -90,6 +89,15 @@ GLOBAL_SKIPS = [
 skips = GLOBAL_SKIPS
 skips += BUILTIN_SKIPS if Ractor.builtin? && RUBY_VERSION < "3.5"
 skips += SHIM_SKIPS if Ractor.shim?
+if Ractor.builtin? && RUBY_VERSION >= "3.5"
+  # fails on 3.5+
+  skips += [
+    "move object with generic ivar", # SEGV
+    "move object with many generic ivars", # SEGV
+    "move object with complex generic ivars", # SEGV
+    "moved composite types move their non-shareable parts properly", # SEGV
+  ]
+end
 if Ractor.builtin? && RUBY_VERSION < "3.4"
   # fails on 3.3
   skips += [
@@ -202,6 +210,10 @@ def generic_assert(expected, code, check, &error_message)
 
   # cleanup global state
   Object.send(:remove_const, :A) if Object.const_defined?(:A)
+
+  unless Ractor::RemoteError.is_a? Class
+    raise "Ractor::RemoteError is no longer a Class!: #{Ractor::RemoteError.inspect}"
+  end
 end
 
 def assert_equal(expected, code, frozen_string_literal: nil)
