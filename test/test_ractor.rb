@@ -929,6 +929,7 @@ assert_equal '333', %q{
   a + b + c + d + e + f
 }
 
+# defined? on ivar of module
 assert_equal '["instance-variable", "instance-variable", nil]', %q{
   class C
     @iv1 = ""

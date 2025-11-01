@@ -56,6 +56,14 @@ if Ractor.shim?
       Ractor.current.__send__(:receive)
     end
 
+    class << self
+      alias_method :recv, :receive
+
+      def new(...)
+        super(...)
+      end
+    end
+
     # def self.select_simple_spinning(*ractors)
     #   raise ArgumentError, "specify at least one ractor or `yield_value`" if ractors.empty?
     #   while true
@@ -85,9 +93,9 @@ if Ractor.shim?
         while true
           ractors.each do |ractor_or_port|
             if Ractor === ractor_or_port
-              queue = ractor_or_port.out_queue
+              queue = ractor_or_port.__send__(:out_queue)
             elsif Ractor::Port === ractor_or_port
-              queue = ractor_or_port.queue
+              queue = ractor_or_port.__send__(:queue)
             else
               raise ArgumentError, "Unexpected argument for Ractor.select: #{ractor_or_port}"
             end
@@ -125,7 +133,8 @@ if Ractor.shim?
 
     attr_reader :name
 
-    attr_reader :in_queue, :out_queue
+    attr_reader :out_queue
+    private :out_queue
 
     def initialize(*args, name: nil, &block)
       raise ArgumentError, "must be called with a block" unless block
@@ -263,6 +272,7 @@ if Ractor.shim?
     def inspect
       ["#<Ractor:##{@id}", @name, @from, "#{@status}>"].compact.join(' ')
     end
+    alias_method :to_s, :inspect
 
     MAIN_RACTOR = Ractor.allocate
     MAIN_RACTOR.__send__(:initialize_main)
@@ -342,9 +352,10 @@ if Ractor.builtin?
       end
     end
 
-    def <<(message)
+    def send(message)
       @pipe.send(message)
     end
+    alias_method :<<, :send
 
     def receive
       @pipe.take
@@ -353,22 +364,32 @@ if Ractor.builtin?
     def close
       @pipe.send(QUIT)
     end
+
+    def closed?
+      @pipe.inspect.end_with?(' terminated>')
+    end
+
+    def inspect
+      super
+    end
   end unless defined?(Ractor::Port)
 else
   class Ractor::Port
     attr_reader :queue
+    private :queue
 
     def initialize
       @queue = Queue.new
     end
 
-    def <<(message)
+    def send(message)
       Ractor::SELECT_MUTEX.synchronize {
         @queue << message
         Ractor::SELECT_CV.broadcast
       }
       self
     end
+    alias_method :<<, :send
 
     def receive
       @queue.pop
@@ -380,6 +401,14 @@ else
         Ractor::SELECT_CV.broadcast
       }
       self
+    end
+
+    def closed?
+      @queue.closed?
+    end
+
+    def inspect
+      super
     end
   end
 end

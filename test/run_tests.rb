@@ -107,7 +107,7 @@ if Ractor.builtin? && RUBY_VERSION < "3.4"
     "ivar in shareable-objects are not allowed to access from non-main Ractor",
     "ivar in shareable-objects are not allowed to access from non-main Ractor, by @iv (get)",
     "ivar in shareable-objects are not allowed to access from non-main Ractor, by @iv (set)",
-    900,
+    "defined? on ivar of module",
     "moved objects have their shape properly set to original object's shape",
     "Ractor-local storage with Thread inheritance of current Ractor",
     "require in Ractor",

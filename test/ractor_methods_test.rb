@@ -57,13 +57,25 @@ modules.each do |mod|
 
   if methods != expected
     extras = methods - expected
+    missing = expected - methods
+
     if mod == "Ractor.singleton_class"
       extras -= %i[builtin? shim?] # intended extras
     end
 
-    raise "#{mod} methods should not include #{extras}" unless extras.empty?
+    if RUBY_ENGINE == "ruby" and RUBY_VERSION < "3.5"
+      if mod == "Ractor"
+        extras -= %i[take close_incoming close_outgoing] # expected extra on those versions
+        missing -= %i[default_port monitor unmonitor] # hard to implement on those versions
+      elsif mod == "Ractor.singleton_class"
+        extras -= %i[yield receive_if] # expected extra on those versions
+        if RUBY_VERSION < "3.4"
+          missing -= %i[[] []= store_if_absent _require] # hard to implement on those versions
+        end
+      end
+    end
 
-    missing = expected - methods
+    raise "#{mod} methods should not include #{extras}" unless extras.empty?
     raise "#{mod} methods should include #{missing}" unless missing.empty?
   end
 end
