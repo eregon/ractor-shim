@@ -30,6 +30,7 @@ BUILTIN_SKIPS = [
   "monitor returns false if the monitoring Ractor was terminated.", # Ractor#monitor
   "monitor port returns `:aborted` when the monitering Ractor is aborted.", # Ractor#monitor
   "monitor port returns `:aborted` even if the monitoring Ractor was aborted.", # Ractor#monitor
+  "eval with outer locals in a Ractor raises SyntaxError", # can't check
 ]
 
 SHIM_SKIPS = [
@@ -71,6 +72,7 @@ SHIM_SKIPS = [
   "moved hashes can't be used", # expected due to no move
   "moved composite types move their non-shareable parts properly", # expected due to no move
   "Only one Ractor can call Ractor#value", # could be implemented
+  "eval with outer locals in a Ractor raises SyntaxError", # can't check
 ]
 
 GLOBAL_SKIPS = [

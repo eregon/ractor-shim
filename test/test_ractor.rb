@@ -1,4 +1,4 @@
-# From https://github.com/ruby/ruby/blob/master/bootstraptest/test_ractor.rb
+# From https://github.com/ruby/ruby/blob/390d77ba00f9e8f18a5408b404365db0b25fbf37/bootstraptest/test_ractor.rb
 
 # Ractor.current returns a current ractor
 assert_equal 'Ractor', %q{
@@ -255,7 +255,7 @@ assert_equal 30.times.map { 'ok' }.to_s, %q{
   30.times.map{|i|
     test i
   }
-} unless (ENV.key?('TRAVIS') && ENV['TRAVIS_CPU_ARCH'] == 'arm64') # https://bugs.ruby-lang.org/issues/17878
+} # unless (ENV.key?('TRAVIS') && ENV['TRAVIS_CPU_ARCH'] == 'arm64') # https://bugs.ruby-lang.org/issues/17878
 
 # Exception for empty select
 assert_match /specify at least one ractor/, %q{
@@ -468,6 +468,7 @@ assert_equal "ok", <<~'RUBY', frozen_string_literal: false
   echo_ractor = Ractor.new port do |port|
     loop do
       v = Ractor.receive
+      break if v == :stop
       port << v
     end
   end
@@ -527,7 +528,7 @@ assert_equal "ok", <<~'RUBY', frozen_string_literal: false
   }
 
   if results.empty?
-    port.close; echo_ractor.close; :ok
+    port.close; echo_ractor << :stop; echo_ractor.join; :ok
   else
     results.inspect
   end
@@ -754,6 +755,37 @@ assert_equal 'ArgumentError', %q{
   rescue => e
     e.class
   end
+}
+
+# eval with outer locals in a Ractor raises SyntaxError
+# [Bug #21522]
+assert_equal 'SyntaxError', %q{
+  outer = 42
+  r = Ractor.new do
+    eval("outer")
+  end
+  begin
+    r.value
+  rescue Ractor::RemoteError => e
+    e.cause.class
+  end
+}
+
+# eval of an undefined name in a Ractor raises NameError
+assert_equal 'NameError', %q{
+  r = Ractor.new do
+    eval("totally_undefined_name")
+  end
+  begin
+    r.value
+  rescue Ractor::RemoteError => e
+    e.cause.class
+  end
+}
+
+# eval of a local defined inside the Ractor works
+assert_equal '99', %q{
+  Ractor.new { inner = 99; eval("inner").to_s }.value
 }
 
 # ivar in shareable-objects are not allowed to access from non-main Ractor
@@ -1158,16 +1190,19 @@ assert_equal 'true', %q{
   [a.frozen?, a[0].frozen?] == [true, false]
 }
 
-# Ractor.make_shareable(a_proc) is not supported now.
-assert_equal 'true', %q{
-  pr = Proc.new{}
+# Ractor.make_shareable(a_proc) requires a shareable receiver
+assert_equal '[:ok, "Proc\'s self is not shareable:"]', %q{
+  pr1 = nil.instance_exec { Proc.new{} }
+  pr2 = Proc.new{}
 
-  begin
-    Ractor.make_shareable(pr)
-  rescue Ractor::Error
-    true
-  else
-    false
+  [pr1, pr2].map do |pr|
+    begin
+      Ractor.make_shareable(pr)
+    rescue Ractor::Error => e
+      e.message[/^.+?:/]
+    else
+      :ok
+    end
   end
 }
 
@@ -1265,7 +1300,7 @@ assert_equal '[:ok, :ok]', %q{
       s = 'str'
       trap(:INT){p s}
     }.join
-  rescue => Ractor::RemoteError
+  rescue Ractor::RemoteError
     a << :ok
   end
 }
