@@ -6,6 +6,83 @@ end
 Ractor.define_singleton_method(:builtin?) { builtin_ractor }
 Ractor.define_singleton_method(:shim?) { !builtin_ractor }
 
+# Ractor::Port
+
+if Ractor.builtin?
+  class Ractor::Port
+    QUIT = Object.new.freeze
+
+    def initialize
+      @pipe = Ractor.new do
+        while true
+          msg = Ractor.receive
+          break if QUIT.equal?(msg)
+          Ractor.yield msg
+        end
+      end
+    end
+
+    def send(message)
+      @pipe.send(message)
+    end
+    alias_method :<<, :send
+
+    def receive
+      @pipe.take
+    end
+
+    def close
+      @pipe.send(QUIT)
+    end
+
+    def closed?
+      @pipe.inspect.end_with?(' terminated>')
+    end
+
+    def inspect
+      super
+    end
+  end unless defined?(Ractor::Port)
+else
+  class Ractor::Port
+    attr_reader :queue
+    private :queue
+
+    def initialize
+      @queue = Queue.new
+    end
+
+    def send(message, move: false)
+      Ractor::SELECT_MUTEX.synchronize {
+        @queue << message
+        Ractor::SELECT_CV.broadcast
+      }
+      self
+    end
+    alias_method :<<, :send
+
+    def receive
+      @queue.pop
+    end
+
+    def close
+      Ractor::SELECT_MUTEX.synchronize {
+        @queue.close
+        Ractor::SELECT_CV.broadcast
+      }
+      self
+    end
+
+    def closed?
+      @queue.closed?
+    end
+
+    def inspect
+      super
+    end
+  end
+end
+
 if Ractor.shim?
   class Ractor
     class Error < RuntimeError
@@ -131,7 +208,7 @@ if Ractor.shim?
       Kernel.require(feature)
     end
 
-    attr_reader :name
+    attr_reader :name, :default_port
 
     attr_reader :out_queue
     private :out_queue
@@ -180,7 +257,7 @@ if Ractor.shim?
       @id = GET_ID.call
       @status = :running
       @from = block ? block.source_location.join(":") : nil
-      @in_queue = Queue.new
+      @default_port = Ractor::Port.new
       @out_queue = Queue.new
       @storage = {}
       @exception = nil
@@ -208,32 +285,37 @@ if Ractor.shim?
       end
     end
 
-    def send(message, move: false)
-      raise Ractor::ClosedError, "The port was already closed" if @status == :terminated || @in_queue.closed?
-      @in_queue << message
+    def send(message, ...)
+      raise Ractor::ClosedError, "The port was already closed" if @status == :terminated || @default_port.closed?
+      @default_port.send(message, ...)
       self
     end
     alias_method :<<, :send
 
     private def receive
-      @in_queue.pop
+      @default_port.receive
     end
 
     # def take
     #   @out_queue.pop
     # end
 
-    def close_incoming
-      @in_queue.close
+    private def close_incoming
+      @default_port.close
       self
     end
 
-    def close_outgoing
+    private def close_outgoing
       SELECT_MUTEX.synchronize {
         @out_queue.close
         SELECT_CV.broadcast
       }
       self
+    end
+
+    def close
+      close_incoming
+      close_outgoing
     end
 
     def monitor(port)
@@ -295,15 +377,12 @@ if Ractor.builtin?
         self == Ractor.main
       end
     end
-  end
-end
 
-# common
-class Ractor
-  unless method_defined?(:close)
-    def close
-      close_incoming
-      close_outgoing
+    unless method_defined?(:close)
+      def close
+        close_incoming
+        close_outgoing
+      end
     end
   end
 end
@@ -332,83 +411,6 @@ class << Ractor
     unless method_defined?(:shareable_lambda)
       alias_method :shareable_lambda, :lambda
       public :shareable_lambda
-    end
-  end
-end
-
-# Ractor::Port
-
-if Ractor.builtin?
-  class Ractor::Port
-    QUIT = Object.new.freeze
-
-    def initialize
-      @pipe = Ractor.new do
-        while true
-          msg = Ractor.receive
-          break if QUIT.equal?(msg)
-          Ractor.yield msg
-        end
-      end
-    end
-
-    def send(message)
-      @pipe.send(message)
-    end
-    alias_method :<<, :send
-
-    def receive
-      @pipe.take
-    end
-
-    def close
-      @pipe.send(QUIT)
-    end
-
-    def closed?
-      @pipe.inspect.end_with?(' terminated>')
-    end
-
-    def inspect
-      super
-    end
-  end unless defined?(Ractor::Port)
-else
-  class Ractor::Port
-    attr_reader :queue
-    private :queue
-
-    def initialize
-      @queue = Queue.new
-    end
-
-    def send(message)
-      Ractor::SELECT_MUTEX.synchronize {
-        @queue << message
-        Ractor::SELECT_CV.broadcast
-      }
-      self
-    end
-    alias_method :<<, :send
-
-    def receive
-      @queue.pop
-    end
-
-    def close
-      Ractor::SELECT_MUTEX.synchronize {
-        @queue.close
-        Ractor::SELECT_CV.broadcast
-      }
-      self
-    end
-
-    def closed?
-      @queue.closed?
-    end
-
-    def inspect
-      super
     end
   end
 end
