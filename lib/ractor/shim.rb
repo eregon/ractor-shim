@@ -200,6 +200,14 @@ if Ractor.shim?
       true
     end
 
+    def self.[](var)
+      Ractor.current[var]
+    end
+
+    def self.[]=(var, value)
+      Ractor.current[var] = value
+    end
+
     def self.store_if_absent(var, &block)
       Ractor.current.__send__(:store_if_absent, var, &block)
     end
