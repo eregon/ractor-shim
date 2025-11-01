@@ -231,3 +231,5 @@ end
 Warning[:experimental] = false
 
 require_relative 'test_ractor'
+
+require_relative 'ractor_methods_test'
