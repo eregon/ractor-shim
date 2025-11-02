@@ -94,10 +94,10 @@ skips += SHIM_SKIPS if Ractor.shim?
 if Ractor.builtin? && RUBY_VERSION >= "3.5"
   # fails on 3.5+
   skips += [
-    "move object with generic ivar", # SEGV
-    "move object with many generic ivars", # SEGV
-    "move object with complex generic ivars", # SEGV
-    "moved composite types move their non-shareable parts properly", # SEGV
+    # "move object with generic ivar", # SEGV
+    # "move object with many generic ivars", # SEGV
+    # "move object with complex generic ivars", # SEGV
+    # "moved composite types move their non-shareable parts properly", # SEGV
   ]
 end
 if Ractor.builtin? && RUBY_VERSION < "3.4"
