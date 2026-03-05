@@ -89,10 +89,10 @@ GLOBAL_SKIPS = [
 ]
 
 skips = GLOBAL_SKIPS
-skips += BUILTIN_SKIPS if Ractor.builtin? && RUBY_VERSION < "3.5"
+skips += BUILTIN_SKIPS if Ractor.builtin? && RUBY_VERSION < "4.0"
 skips += SHIM_SKIPS if Ractor.shim?
-if Ractor.builtin? && RUBY_VERSION >= "3.5"
-  # fails on 3.5+
+if Ractor.builtin? && RUBY_VERSION >= "4.0"
+  # fails on 4.0+
   skips += [
     "move object with generic ivar", # SEGV
     "move object with many generic ivars", # SEGV

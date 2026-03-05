@@ -25,7 +25,7 @@ def ruby(code, *flags)
   }
 end
 
-if RUBY_ENGINE == "ruby" && RUBY_VERSION >= "3.5"
+if RUBY_ENGINE == "ruby" && RUBY_VERSION >= "4.0"
   modules.each do |mod|
     file = "#{__dir__}/methods/#{mod}.txt"
     code = "puts #{mod}.public_instance_methods(false).sort"
@@ -63,7 +63,7 @@ modules.each do |mod|
       extras -= %i[builtin? shim?] # intended extras
     end
 
-    if RUBY_ENGINE == "ruby" and RUBY_VERSION < "3.5"
+    if RUBY_ENGINE == "ruby" and RUBY_VERSION < "4.0"
       if mod == "Ractor"
         extras -= %i[take close_incoming close_outgoing] # expected extra on those versions
         missing -= %i[default_port monitor unmonitor] # hard to implement on those versions
