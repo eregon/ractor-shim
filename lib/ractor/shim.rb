@@ -177,12 +177,8 @@ if Ractor.shim?
               raise ArgumentError, "Unexpected argument for Ractor.select: #{ractor_or_port}"
             end
 
-            begin
-              value = queue.pop(true)
-              return [ractor_or_port, value]
-            rescue ThreadError
-              # keep looping
-            end
+            value = queue.pop(timeout: 0)
+            return [ractor_or_port, value] if value
           end
 
           # Wait until an item is added to a relevant Queue
