@@ -21,7 +21,6 @@ jobs:
           - 3.3
           - 3.4
           - 4.0
-          - head
           - jruby
           - truffleruby
     steps:
