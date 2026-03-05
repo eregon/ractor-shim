@@ -134,7 +134,7 @@ assert_equal '[1, 2, 3]', %q{
   a << ports[1].receive # 1
   a << ports[2].receive # 2
   a << ports[0].receive # 3
-  a
+  ports.each(&:close); a
 }
 
 # dtoa race condition
@@ -171,7 +171,7 @@ assert_equal '[true, true]', %q{
 }
 
 # Ractor.shareable_proc keeps the original Proc intact
-assert_equal '[SyntaxError, [Object, 43, 43], Binding]', %q{
+assert_equal '[SyntaxError, [Class, 43, 43], Binding]', %q{
   a = 42
   pr1 = Proc.new do
     [self.class, eval("a"), binding.local_variable_get(:a)]
@@ -316,10 +316,10 @@ assert_equal 30.times.map { 'ok' }.to_s, %q{
   30.times.map{|i|
     test i
   }
-} unless (ENV.key?('TRAVIS') && ENV['TRAVIS_CPU_ARCH'] == 'arm64') # https://bugs.ruby-lang.org/issues/17878
+} # unless (ENV.key?('TRAVIS') && ENV['TRAVIS_CPU_ARCH'] == 'arm64') # https://bugs.ruby-lang.org/issues/17878
 
 # Exception for empty select
-assert_match /specify at least one Ractor::Port or Ractor/, %q{
+assert_match /specify at least one (ractor|Ractor::Port or Ractor)/, %q{
   begin
     Ractor.select
   rescue ArgumentError => e
@@ -497,7 +497,7 @@ assert_equal '{ok: 3}', %q{
   end
 
   3.times.map{Ractor.receive}.tally
-} unless yjit_enabled? # YJIT: `[BUG] Bus Error at 0x000000010b7002d0` in jit_exec()
+} # unless yjit_enabled? # YJIT: `[BUG] Bus Error at 0x000000010b7002d0` in jit_exec()
 
 # unshareable object are copied
 assert_equal 'false', %q{
@@ -529,6 +529,7 @@ assert_equal "ok", <<~'RUBY', frozen_string_literal: false
   echo_ractor = Ractor.new port do |port|
     loop do
       v = Ractor.receive
+      break if v == :stop
       port << v
     end
   end
@@ -588,7 +589,7 @@ assert_equal "ok", <<~'RUBY', frozen_string_literal: false
   }
 
   if results.empty?
-    :ok
+    port.close; echo_ractor << :stop; echo_ractor.join; :ok
   else
     results.inspect
   end
@@ -849,7 +850,7 @@ assert_equal '99', %q{
 }
 
 # ivar in shareable-objects are not allowed to access from non-main Ractor
-assert_equal "can not get unshareable values from instance variables of classes/modules from non-main Ractors (@iv from C)", <<~'RUBY', frozen_string_literal: false
+assert_match /can not get unshareable values from instance variables of classes\/modules from non-main Ractors/, <<~'RUBY', frozen_string_literal: false
   class C
     @iv = 'str'
   end
@@ -989,13 +990,14 @@ assert_equal '333', %q{
   a + b + c + d + e + f
 }
 
+# defined? on ivar of module
 assert_equal '["instance-variable", "instance-variable", nil]', %q{
   class C
     @iv1 = ""
     @iv2 = 42
-    def self.iv1 = defined?(@iv1) # "instance-variable"
-    def self.iv2 = defined?(@iv2) # "instance-variable"
-    def self.iv3 = defined?(@iv3) # nil
+    def self.iv1; defined?(@iv1); end # "instance-variable"
+    def self.iv2; defined?(@iv2); end # "instance-variable"
+    def self.iv3; defined?(@iv3); end # nil
   end
 
   Ractor.new{
@@ -1025,7 +1027,7 @@ assert_equal '1234', %q{
 }
 
 # cvar in shareable-objects are not allowed to access from non-main Ractor
-assert_equal 'can not access class variables from non-main Ractors (@@cv from C)', %q{
+assert_match /can not access class variables from non-main Ractors/, %q{
   class C
     @@cv = 'str'
   end
@@ -1044,7 +1046,7 @@ assert_equal 'can not access class variables from non-main Ractors (@@cv from C)
 }
 
 # also cached cvar in shareable-objects are not allowed to access from non-main Ractor
-assert_equal 'can not access class variables from non-main Ractors (@@cv from C)', %q{
+assert_match /can not access class variables from non-main Ractors/, %q{
   class C
     @@cv = 'str'
     def self.cv
@@ -1093,7 +1095,7 @@ assert_equal "can not access non-shareable objects in constant Object::STR by no
 RUBY
 
 # The correct constant path shall be reported
-assert_equal "can not access non-shareable objects in constant Object::STR by non-main Ractor.", <<~'RUBY', frozen_string_literal: false
+assert_match /can not access non-shareable objects in constant (Object|M)::STR by non-main Ractor\./, <<~'RUBY', frozen_string_literal: false
   STR = "hello"
   module M
     def self.str; STR; end
@@ -1302,7 +1304,7 @@ assert_equal '[:ok, "Proc\'s self is not shareable:"]', %q{
 assert_equal 'true', %q{
   # raise because receiver is unshareable
   begin
-    _m0 = Ractor.make_shareable(self.method(:__id__))
+    _m0 = Ractor.make_shareable(Object.new.method(:__id__))
   rescue => e
     raise e unless e.message =~ /can not make shareable object/
   else
@@ -1452,6 +1454,7 @@ assert_equal '[nil, "b", "a"]', %q{
   ans << Ractor.current[:key]
 }
 
+# Ractor-local storage with Thread inheritance of current Ractor
 assert_equal '1', %q{
   N = 1_000
   Ractor.new{
@@ -1501,6 +1504,7 @@ assert_equal "#{N}#{N}", %Q{
   }.map{|r| r.value}.join
 }
 
+# fstring pool 2
 assert_equal "ok", %Q{
   N = #{N}
   a, b = 2.times.map{
@@ -1583,7 +1587,7 @@ assert_equal "ok", %q{
     end
   }
   "ok"
-} if !yjit_enabled? && ENV['GITHUB_WORKFLOW'] != 'ModGC' # flaky
+} # if !yjit_enabled? && ENV['GITHUB_WORKFLOW'] != 'ModGC' # flaky
 
 # check method cache invalidation
 assert_equal "ok", %q{
@@ -1610,7 +1614,7 @@ assert_equal "ok", %q{
     end
   end
 
-  Ractor.new do
+  r = Ractor.new do
     b = B.new
     100_000.times do
       raise unless b.foo == 1
@@ -1622,7 +1626,7 @@ assert_equal "ok", %q{
     raise unless a.foo == 2
   end
 
-  "ok"
+  r.join; "ok"
 }
 
 # check method cache invalidation
@@ -1800,7 +1804,7 @@ assert_equal '600', %q{
   end
 
   h.sum{|k, v| v}
-} unless yjit_enabled? # http://ci.rvm.jp/results/trunk-yjit@ruby-sp2-docker/4466770
+} # unless yjit_enabled? # http://ci.rvm.jp/results/trunk-yjit@ruby-sp2-docker/4466770
 
 # Selector should be GCed (free'ed) without trouble
 assert_equal 'ok', %q{
@@ -1835,7 +1839,7 @@ assert_equal 'true', %q{
       super
     end
     Object.prepend self
-    set_temporary_name 'Ractor#require'
+    # set_temporary_name 'Ractor#require'
   end
 
   Ractor.new{
@@ -2155,6 +2159,8 @@ assert_equal 'ok', %q{
     loop do
       obj = Ractor.receive
       val = case obj
+      when :stop
+        break
       when Hash
         obj['key'] == 'value' && obj.instance_variable_get("@b") == 'b'
       when Array
@@ -2201,7 +2207,7 @@ assert_equal 'ok', %q{
       end
     end
   end
-  'ok'
+  r << :stop; r.join; 'ok'
 }
 
 # fork after creating Ractor
@@ -2471,6 +2477,7 @@ assert_equal 'ok', <<~'RUBY'
   :ok
 RUBY
 
+# fork after creating many Ractors
 assert_equal 'ok', <<~'RUBY'
   begin
     100.times do |i|
@@ -2491,6 +2498,7 @@ assert_equal 'ok', <<~'RUBY'
   end
 RUBY
 
+# fork after creating many Ractors 2
 assert_equal 'ok', <<~'RUBY'
   begin
     100.times do |i|

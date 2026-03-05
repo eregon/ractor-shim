@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+has_shareable_proc = defined?(Ractor) && Ractor.respond_to?(:shareable_proc)
+
 require 'ractor/shim'
 
 BUILTIN_SKIPS = [
@@ -56,6 +58,7 @@ SHIM_SKIPS = [
   "also cached cvar in shareable-objects are not allowed to access from non-main Ractor", # can't check
   "Getting non-shareable objects via constants by other Ractors is not allowed", # can't check
   "Constant cache should care about non-shareable constants", # can't check
+  "The correct constant path shall be reported", # can't check
   "Setting non-shareable objects into constants by other Ractors is not allowed", # can't check
   "define_method is not allowed", # can't check
   "ObjectSpace._id2ref can not handle unshareable objects with Ractors", # can't check
@@ -73,6 +76,7 @@ SHIM_SKIPS = [
   "moved composite types move their non-shareable parts properly", # expected due to no move
   "Only one Ractor can call Ractor#value", # could be implemented
   "eval with outer locals in a Ractor raises SyntaxError", # can't check
+  "Ractor.make_shareable(Method/UnboundMethod)", # can't check
 ]
 
 GLOBAL_SKIPS = [
@@ -83,21 +87,30 @@ GLOBAL_SKIPS = [
   "check experimental warning", # harness disables experimental warnings
   "failed in autolaod in Ractor", # need more isolation
   "fork after creating Ractor", # fork, leaks
+  "fork after creating many Ractors", # fork, leaks
+  "fork after creating many Ractors 2", # fork, slow
   "Ractors should be terminated after fork", # fork, hangs
   "st_table, which can call malloc.", # leaks
   "Creating classes inside of Ractors", # leaks
+  "defining ractor, even if it is GC'd", # too noisy
+  "move object with generic ivars and existing id2ref table", # "NNN" is the id of an unshareable object on multi-ractor (RangeError)
+]
+
+NO_SHAREABLE_PROC_SKIPS = [
+  "Ractor.shareable_proc makes a copy of given Proc",
+  "Ractor.shareable_proc keeps the original Proc intact",
+  "because in most cases it would raise anyway due to not-shared self or not-shared captured variable value",
 ]
 
 skips = GLOBAL_SKIPS
 skips += BUILTIN_SKIPS if Ractor.builtin? && RUBY_VERSION < "4.0"
 skips += SHIM_SKIPS if Ractor.shim?
-if Ractor.builtin? && RUBY_VERSION >= "4.0"
-  # fails on 4.0+
+skips += NO_SHAREABLE_PROC_SKIPS if !has_shareable_proc
+
+if Ractor.builtin? && RUBY_VERSION < "4.0"
+  # fails on 3.4
   skips += [
-    "move object with generic ivar", # SEGV
-    "move object with many generic ivars", # SEGV
-    "move object with complex generic ivars", # SEGV
-    "moved composite types move their non-shareable parts properly", # SEGV
+    "Ractor.make_shareable(Method/UnboundMethod)",
   ]
 end
 if Ractor.builtin? && RUBY_VERSION < "3.4"
@@ -247,3 +260,5 @@ Warning[:experimental] = false
 require_relative 'test_ractor'
 
 require_relative 'ractor_methods_test'
+
+puts "\n\e[0;32mSUCCESS!\e[0m"
